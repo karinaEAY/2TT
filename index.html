@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimized Chest Clicker</title>
+    
+    <!-- Preload key image assets to prevent flicker -->
+    <link rel="preload" href="https://i.ibb.co/0pX8qKCJ/chestclosed.png" as="image">
+    <link rel="preload" href="https://i.ibb.co/LDfdPvzL/chestopened.png" as="image">
+    <link rel="preload" href="https://wallpaper.forfun.com/fetch/d8/d8c01a62c40b2184421d67e5f7cbad5f.jpeg" as="image">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            /* Enable fast-tap on mobile and disable double-tap zoom */
+            touch-action: manipulation;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            position: relative;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+
+            /* UPDATED: Custom background image with 80% darkening */
+            background-image: url('https://wallpaper.forfun.com/fetch/d8/d8c01a62c40b2184421d67e5f7cbad5f.jpeg');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center center;
+            background-color: rgba(0, 0, 0, 0.8); /* Darkens the image to 80% */
+            background-blend-mode: multiply; /* Blends the color with the image */
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            position: relative;
+        }
+
+        .chest-container {
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+            user-select: none;
+            z-index: 20;
+            transform: translateZ(0);
+        }
+
+        .chest-container:active {
+            transform: scale(0.95) translateZ(0);
+        }
+
+        .chest {
+            width: 80vw;
+            height: 80vw;
+            max-width: 300px;
+            max-height: 300px;
+            background-image: url('https://i.ibb.co/0pX8qKCJ/chestclosed.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            transition: background-image 0.3s ease;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+            transform: translateZ(0);
+            position: relative;
+        }
+
+        .chest.opened {
+            background-image: url('https://i.ibb.co/LDfdPvzL/chestopened.png');
+        }
+
+        .chest.opened::after {
+            content: '';
+            position: absolute;
+            top: -20%;
+            left: -20%;
+            width: 140%;
+            height: 140%;
+            background: radial-gradient(circle, rgba(255,215,0,0.6) 0%, rgba(255,215,0,0) 65%);
+            border-radius: 50%;
+            opacity: 0;
+            animation: shine-alt 0.5s ease-in-out 3;
+            pointer-events: none;
+        }
+
+        @keyframes shine-alt {
+            0%, 100% { 
+                opacity: 0; 
+                transform: scale(0.8); 
+            }
+            50% { 
+                opacity: 1; 
+                transform: scale(1.1); 
+            }
+        }
+
+        .success-message {
+            display: none;
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 0 0 10px #FFD700, 0 0 20px #fff, 0 0 30px #fff;
+            z-index: 50;
+            pointer-events: none;
+            text-transform: uppercase;
+        }
+
+        .success-message.show {
+            display: block;
+            animation: pulseGlow 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% {
+                transform: translateX(-50%) scale(1);
+                opacity: 1;
+                text-shadow: 0 0 10px #FFD700, 0 0 20px #FFF;
+            }
+            50% {
+                transform: translateX(-50%) scale(1.1);
+                opacity: 0.9;
+                text-shadow: 0 0 20px #FFD700, 0 0 40px #FFF;
+            }
+        }
+
+        #particle-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .particle {
+            display: none;
+            position: fixed;
+            pointer-events: none;
+            will-change: transform, opacity;
+        }
+        
+        .coin {
+            width: 18px;
+            height: 18px;
+            background: radial-gradient(circle at 30% 30%, #FFD700, #D4AF37, #B8860B);
+            border-radius: 50%;
+            z-index: 10;
+            box-shadow: 0 0 6px rgba(255, 215, 0, 0.8), inset 0 2px 3px rgba(255, 255, 255, 0.5);
+            border: 1px solid #FFEC8B;
+        }
+
+        .confetti {
+            width: 10px;
+            height: 10px;
+            z-index: 10;
+        }
+
+        .click-effect {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            z-index: 5;
+        }
+
+        .floating-emoji {
+            font-size: 26px;
+            z-index: 15;
+        }
+
+        .falling-emoji {
+            font-size: 26px;
+            z-index: 20;
+            opacity: 0.8;
+        }
+
+        /* NEW: Snowflake specific styles */
+        .snowflake {
+            color: white;
+            z-index: 15; /* Behind chest (20) but visible */
+            text-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+            user-select: none;
+        }
+
+        @keyframes ripple {
+            0% { transform: scale(0); opacity: 1; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-40px) scale(0.5); opacity: 0; }
+        }
+
+        @keyframes fly-out {
+            0% {
+                transform: translate(0, 0) rotate(0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--end-x), var(--end-y)) rotate(720deg) scale(0.5);
+                opacity: 0.2;
+            }
+        }
+
+        @keyframes fall-down {
+            0% {
+                transform: translateY(0) translateX(0) rotate(0);
+            }
+            100% {
+                transform: translateY(calc(100vh + 50px)) translateX(var(--sway)) rotate(360deg);
+            }
+        }
+
+        .background-particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .bg-particle {
+            position: absolute;
+            width: var(--size);
+            height: var(--size);
+            background: rgba(255,255,255,0.8);
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(255,255,255,0.7);
+            animation: float 15s infinite linear;
+            will-change: transform;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(100vh) rotate(0deg); }
+            100% { transform: translateY(-100px) rotate(720deg); }
+        }
+
+        .celebration-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent, rgba(0,0,0,0.5));
+            pointer-events: none;
+            opacity: 0;
+            z-index: 30;
+            transition: opacity 0.5s ease;
+            will-change: opacity;
+        }
+
+        .celebration-overlay.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chest-container" id="chestContainer">
+            <div class="chest" id="chest"></div>
+            <div class="success-message" id="successMessage">SUCCESS!</div>
+        </div>
+    </div>
+
+    <div class="background-particles" id="backgroundParticles"></div>
+    <div class="celebration-overlay" id="celebrationOverlay"></div>
+    
+    <div id="particle-container"></div>
+
+    <script>
+        let clickCount = 0;
+        const chest = document.getElementById('chest');
+        const chestContainer = document.getElementById('chestContainer');
+        const overlay = document.getElementById('celebrationOverlay');
+        const particleContainer = document.getElementById('particle-container');
+        const successMessage = document.getElementById('successMessage');
+        
+        const particlePool = [];
+        // INCREASED POOL SIZE to accommodate snow + clicks
+        const maxParticles = 150; 
+
+        function populateParticlePool() {
+            for (let i = 0; i < maxParticles; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.display = 'none';
+                particleContainer.appendChild(particle);
+                particlePool.push(particle);
+            }
+        }
+
+        function getParticle() {
+            if (particlePool.length === 0) {
+                return null;
+            }
+            const particle = particlePool.pop();
+            particle.style.display = 'block';
+            return particle;
+        }
+
+        function returnParticle(particle) {
+            if (particle == null) {
+                console.warn("returnParticle called with null or undefined");
+                return;
+            }
+            
+            particle.onanimationend = null; 
+            particle.style.display = 'none';
+            particle.style.animation = 'none';
+            particle.style.cssText = '';
+            particle.textContent = '';
+            particle.className = 'particle';
+            
+            particlePool.push(particle);
+        }
+
+        function createBackgroundParticles() {
+            const container = document.getElementById('backgroundParticles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'bg-particle';
+                particle.style.left = Math.random() * 100 + 'vw';
+                particle.style.top = Math.random() * 100 + 'vh';
+                particle.style.animationDuration = (Math.random() * 20 + 10) + 's';
+                particle.style.opacity = Math.random() * 0.7 + 0.3;
+                
+                const size = Math.random() * 4 + 2;
+                particle.style.setProperty('--size', size + 'px');
+
+                container.appendChild(particle);
+            }
+        }
+
+        function createCinematicParticle(x, y, type) {
+            const particle = getParticle();
+            if (!particle) return;
+            
+            particle.className = `particle ${type}`;
+
+            if (type === 'confetti') {
+                particle.style.background = `hsl(${Math.random() * 360}, 100%, 60%)`;
+                particle.style.width = Math.random() * 8 + 4 + 'px';
+                particle.style.height = Math.random() * 8 + 4 + 'px';
+                particle.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+            }
+            
+            particle.style.left = x + 'px';
+            particle.style.top = y + 'px';
+            
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * 150 + 100;
+            const duration = Math.random() * 600 + 1000;
+            
+            const endX = Math.cos(angle) * distance;
+            const endY = Math.sin(angle) * distance;
+            
+            particle.style.setProperty('--end-x', endX + 'px');
+            particle.style.setProperty('--end-y', endY + 'px');
+            
+            particle.style.animation = `fly-out ${duration}ms ease-out forwards`;
+            particle.onanimationend = (e) => returnParticle(e.currentTarget);
+        }
+
+        function createRipple(x, y) {
+            const ripple = getParticle();
+            if (!ripple) return;
+            
+            ripple.className = 'particle click-effect';
+            ripple.style.left = (x - 22) + 'px';
+            ripple.style.top = (y - 22) + 'px';
+            
+            ripple.style.animation = 'none';
+            ripple.offsetHeight;
+            ripple.style.animation = 'ripple 0.6s ease-out';
+            
+            ripple.onanimationend = (e) => returnParticle(e.currentTarget);
+        }
+
+        function createFloatingEmoji(x, y, emoji) {
+            const emojiElement = getParticle();
+            if (!emojiElement) return;
+            
+            emojiElement.className = 'particle floating-emoji';
+            emojiElement.textContent = emoji;
+            emojiElement.style.left = x + 'px';
+            emojiElement.style.top = y + 'px';
+            emojiElement.style.fontSize = (Math.random() * 16 + 16) + 'px';
+            
+            emojiElement.style.animation = 'none';
+            emojiElement.offsetHeight;
+            emojiElement.style.animation = 'floatUp 1s ease-out forwards';
+            
+            emojiElement.onanimationend = (e) => returnParticle(e.currentTarget);
+        }
+
+        chestContainer.addEventListener('click', (e) => {
+            clickCount++;
+            
+            createRipple(e.clientX, e.clientY);
+            
+            const particleCount = 6;
+            for (let i = 0; i < particleCount; i++) {
+                setTimeout(() => {
+                    createCinematicParticle(e.clientX, e.clientY, 'coin');
+                }, i * 70);
+            }
+            
+            createFloatingEmoji(e.clientX, e.clientY, ['✨', '⭐', '💎', '🎁'][Math.floor(Math.random() * 4)]);
+            
+            chestContainer.style.transform = 'scale(0.95) rotate(2deg) translateZ(0)';
+            setTimeout(() => {
+                chestContainer.style.transform = 'scale(1) rotate(0deg) translateZ(0)';
+            }, 100);
+            
+            if (clickCount === 23) {
+                chest.classList.add('opened');
+                successMessage.classList.add('show');
+                
+                overlay.classList.add('active');
+                
+                for (let i = 0; i < 60; i++) {
+                    setTimeout(() => {
+                        createCinematicParticle(e.clientX, e.clientY, 'coin');
+                        createCinematicParticle(e.clientX, e.clientY, 'confetti');
+                    }, i * 15);
+                }
+                
+                for (let i = 0; i < 15; i++) {
+                    setTimeout(() => {
+                        createFloatingEmoji(
+                            Math.random() * window.innerWidth,
+                            Math.random() * window.innerHeight,
+                            ['🎉', '🎊', '✨', '⭐', '💎', '🎁', '🏆', '⭐'][Math.floor(Math.random() * 8)]
+                        );
+                    }, i * 150);
+                }
+                
+                document.body.style.animation = 'celebrate 1s ease-in-out';
+                setTimeout(() => {
+                    document.body.style.animation = '';
+                }, 1000);
+            }
+        });
+
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes celebrate {
+                0%, 100% { filter: brightness(1) hue-rotate(0deg); }
+                25% { filter: brightness(1.5) hue-rotate(90deg); }
+                50% { filter: brightness(1.2) hue-rotate(180deg); }
+                75% { filter: brightness(1.4) hue-rotate(270deg); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        createBackgroundParticles();
+        populateParticlePool();
+
+        // Floating emojis on win
+        setInterval(() => {
+            if (clickCount >= 23) {
+                const emoji = getParticle();
+                if (!emoji) return;
+                
+                emoji.className = 'particle falling-emoji';
+                emoji.textContent = ['✨', '⭐', '💎', '🏆', '🎁', '🎊', '🎉'][Math.floor(Math.random() * 7)];
+                emoji.style.left = Math.random() * 100 + 'vw';
+                emoji.style.top = '-50px';
+                emoji.style.fontSize = (Math.random() * 20 + 16) + 'px';
+                
+                const duration = Math.random() * 1500 + 2000;
+                const sway = Math.random() * 40 - 20;
+                
+                emoji.style.setProperty('--sway', sway + 'px');
+                
+                emoji.style.animation = `fall-down ${duration}ms linear forwards`;
+                emoji.onanimationend = (e) => returnParticle(e.currentTarget);
+            }
+        }, 800);
+
+        // NEW: Snowfall effect (runs continuously)
+        setInterval(() => {
+            const snowflake = getParticle();
+            if (!snowflake) return;
+
+            snowflake.className = 'particle snowflake';
+            snowflake.textContent = ['❄', '❅', '❆'][Math.floor(Math.random() * 3)];
+            snowflake.style.left = Math.random() * 100 + 'vw';
+            snowflake.style.top = '-40px'; // Start above viewport
+            
+            const size = Math.random() * 15 + 10; // 10px to 25px
+            snowflake.style.fontSize = size + 'px';
+            snowflake.style.opacity = Math.random() * 0.5 + 0.4; // 0.4 to 0.9 opacity
+
+            const duration = Math.random() * 3000 + 5000; // 5s to 8s (slow fall)
+            const sway = Math.random() * 100 - 50; // Sway left/right
+
+            snowflake.style.setProperty('--sway', sway + 'px');
+            snowflake.style.animation = `fall-down ${duration}ms linear forwards`;
+            
+            snowflake.onanimationend = (e) => returnParticle(e.currentTarget);
+        }, 250); // Create a snowflake every 250ms
+
+        // NEW: Disable zoom on double-tap for mobile devices
+        document.body.addEventListener('touchstart', function(event) {
+            if (event.touches.length > 1) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+    </script>
+</body>
+</html>
